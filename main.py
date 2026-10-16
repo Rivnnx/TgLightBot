@@ -1,13 +1,12 @@
+import os
 import asyncio
 import logging
 import json
 import io
 import time
 import tracemalloc
-import os
-import asyncio
-import logging
 from datetime import datetime, timezone, timedelta
+from aiohttp import web  # Добавлено для веб-сервера Render
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 from aiogram.filters import Command
@@ -28,10 +27,25 @@ MY_GROUP = "GPV54.1"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# --- ДОБАВЛЕНО: Фоновый веб-сервер для обхода сна на Render ---
+async def handle_health_check(request):
+    return web.Response(text="Bot is alive and running!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle_health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+# ---------------------------------------------------------------
+
+# Клавиатура (текст кнопок должен точно совпадать с F.text в хэндлерах)
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Графік (Княгині Інгігерди, 15)")],
-        [KeyboardButton(text="🛠in progress")]
+        [KeyboardButton(text="💡 Графік (Княгині Інгігерди, 15)")],
+        [KeyboardButton(text="🛠 Майбутня задача")]
     ],
     resize_keyboard=True
 )
@@ -43,7 +57,6 @@ def fetch_schedule_data():
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         }
-        
         
         response = requests.get(url, headers=headers, impersonate="chrome110")
 
@@ -122,7 +135,6 @@ def fetch_schedule_data():
 
 def create_schedule_image(schedule):
     """Створює оптимізоване зображення з графіком відключень (без зайвого тексту)"""
-    # Зменшено розмір полотна (з 640 до 485 у висоту) для економії оперативної пам'яті сервера
     img = Image.new('RGB', (390, 485), color='#FFFFFF')
     draw = ImageDraw.Draw(img)
     
@@ -131,7 +143,7 @@ def create_schedule_image(schedule):
     except:
         font_text = ImageFont.load_default()
     
-    start_y = 15 # Відступ зверху тепер мінімальний
+    start_y = 15
     row_h = 35
     col1_x = 20
     col2_x = 195
@@ -182,7 +194,6 @@ def create_schedule_image(schedule):
             draw_cell(col2_x, start_y + (i-1)*row_h, hour_str2, status2)
             
     bio = io.BytesIO()
-    # optimize=True зменшить вагу фінального файлу перед надсиланням
     img.save(bio, format='PNG', optimize=True)
     bio.seek(0)
     return bio
@@ -208,7 +219,6 @@ async def send_schedule(message: Message):
     elif not data:
         await wait_msg.edit_text("⚠️ Немає даних для вашої групи.")
     else:
-        # Формуємо дати та підпис для повідомлення
         dates = list(data.keys())
         dates_str = ", ".join(dates)
         
@@ -223,7 +233,6 @@ async def send_schedule(message: Message):
             photo = BufferedInputFile(img_bytes.read(), filename="schedule.png")
             await message.answer_photo(photo=photo, caption=caption_text)
         else:
-            # Для кількох днів легенда буде прикріплена лише до групи
             media_group = MediaGroupBuilder(caption=caption_text)
             for date_str, sched in data.items():
                 img_bytes = await asyncio.to_thread(create_schedule_image, sched)
@@ -249,6 +258,11 @@ async def handle_future_task(message: Message):
 
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    
+    # ДОБАВЛЕНО: Сначала запускаем веб-сервер...
+    await start_web_server()
+    
+    # ...а затем запускаем опрос Telegram
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ MY_GROUP = "GPV54.1"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+user_cooldowns = {}
 
 async def handle_health_check(request):
     return web.Response(text="Bot is alive and running!")
@@ -200,6 +201,15 @@ async def cmd_start(message: Message):
 
 @dp.message(F.text == "💡 Графік (Княгині Інгігерди, 15)")
 async def send_schedule(message: Message):
+    user_id = message.from_user.id
+    current_time = time.time()
+
+    if user_id in user_cooldowns:
+        time_left = user_cooldowns[user_id] - current_time
+        if time_left > 0:
+            await message.answer(f"⏳ Зачекайте ще {int(time_left)} сек. перед наступним оновленням графіка.")
+            return
+
     start_time = time.perf_counter()
     tracemalloc.clear_traces()
 
@@ -208,18 +218,19 @@ async def send_schedule(message: Message):
     data = await asyncio.to_thread(fetch_schedule_data)
     
     if "error" in data:
+        user_cooldowns[user_id] = time.time() + 10
         await wait_msg.edit_text(data["error"])
         return
     elif not data:
+        user_cooldowns[user_id] = time.time() + 10
         await wait_msg.edit_text("⚠️ Немає даних для вашої групи.")
         return
     else:
+        user_cooldowns[user_id] = time.time() + 60
+        
         dates = list(data.keys())
         dates_str = ", ".join(dates)
-        
-        caption_text = (
-            f"🗓 Графік на: {dates_str}\n\n"
-        )
+        caption_text = f"🗓 Графік на: {dates_str}\n\n"
 
         if len(data) == 1:
             date_str = dates[0]

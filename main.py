@@ -51,14 +51,28 @@ keyboard = ReplyKeyboardMarkup(
 )
 
 def fetch_schedule_data():
-    """Синхронна функція для алгоритмічного парсингу HTML-коду ДТЕК"""
+    """Синхронна функція для парсингу з покращеним обходом Cloudflare"""
     try:
         url = "https://www.dtek-kem.com.ua/ua/shutdowns"
+        
+        # Додаємо максимально реалістичні заголовки звичайного браузера
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Cache-Control": "max-age=0",
+            "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1"
         }
         
-        response = requests.get(url, headers=headers, impersonate="chrome110")
+        # Підвищуємо версію impersonate до сучаснішої (chrome120 замість chrome110)
+        response = requests.get(url, headers=headers, impersonate="chrome120")
 
         if response.status_code != 200:
             return {"error": f"❌ Помилка доступу до сайту ДТЕК: {response.status_code}"}
@@ -66,12 +80,16 @@ def fetch_schedule_data():
         text = response.text
         
         if "Just a moment" in text or "cloudflare" in text.lower() or "challenge-platform" in text:
-            return {"error": "❌ Cloudflare заблокував запит (вимагає перевірку браузера)."}
+            return {"error": "❌ Cloudflare остаточно заблокував IP-адресу Render."}
 
         search_key = "DisconSchedule.fact ="
         if search_key not in text:
-            return {"error": "❌ Змінну не знайдено на сторінці."}
+            # ВАЖЛИВО: Якщо змінної немає, бот виведе перші 400 символів коду сторінки.
+            # Це дозволить нам зрозуміти, яку саме сторінку віддав сайт замість графіка.
+            snippet = text[:400].replace('<', '&lt;').replace('>', '&gt;')
+            return {"error": f"❌ Змінну не знайдено. Сервер повернув іншу сторінку:\n\n{snippet}..."}
 
+        # --- Старий перевірений код парсингу ---
         js_code = text.split(search_key)[1]
         start_idx = js_code.find("{")
         

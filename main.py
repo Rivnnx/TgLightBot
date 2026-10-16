@@ -6,7 +6,7 @@ import io
 import time
 import tracemalloc
 from datetime import datetime, timezone, timedelta
-from aiohttp import web  # Добавлено для веб-сервера Render
+from aiohttp import web 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 from aiogram.filters import Command
@@ -14,7 +14,6 @@ from aiogram.utils.media_group import MediaGroupBuilder
 from curl_cffi import requests
 from PIL import Image, ImageDraw, ImageFont
 
-# Вмикаємо відстеження виділення пам'яті
 tracemalloc.start()
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -27,7 +26,6 @@ MY_GROUP = "GPV54.1"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- ДОБАВЛЕНО: Фоновый веб-сервер для обхода сна на Render ---
 async def handle_health_check(request):
     return web.Response(text="Bot is alive and running!")
 
@@ -41,7 +39,6 @@ async def start_web_server():
     await site.start()
 # ---------------------------------------------------------------
 
-# Клавиатура (текст кнопок должен точно совпадать с F.text в хэндлерах)
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="💡 Графік (Княгині Інгігерди, 15)")],
@@ -51,45 +48,23 @@ keyboard = ReplyKeyboardMarkup(
 )
 
 def fetch_schedule_data():
-    """Синхронна функція для парсингу з покращеним обходом Cloudflare"""
     try:
-        url = "https://www.dtek-kem.com.ua/ua/shutdowns"
+        target_url = "https://www.dtek-kem.com.ua/ua/shutdowns"
+        API_KEY = "d7c3e34d53932ba11bab77f21dcece2c"
         
-        # Додаємо максимально реалістичні заголовки звичайного браузера
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Cache-Control": "max-age=0",
-            "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Upgrade-Insecure-Requests": "1"
-        }
+        api_url = f"http://api.scraperapi.com?api_key={API_KEY}&url={target_url}&render=true"
         
-        # Підвищуємо версію impersonate до сучаснішої (chrome120 замість chrome110)
-        response = requests.get(url, headers=headers, impersonate="chrome120")
+        response = requests.get(api_url, timeout=60)
 
         if response.status_code != 200:
-            return {"error": f"❌ Помилка доступу до сайту ДТЕК: {response.status_code}"}
+            return {"error": f"❌ Помилка API або ДТЕК: {response.status_code}\nВідповідь: {response.text[:200]}"}
             
         text = response.text
-        
-        if "Just a moment" in text or "cloudflare" in text.lower() or "challenge-platform" in text:
-            return {"error": "❌ Cloudflare остаточно заблокував IP-адресу Render."}
 
         search_key = "DisconSchedule.fact ="
         if search_key not in text:
-            # ВАЖЛИВО: Якщо змінної немає, бот виведе перші 400 символів коду сторінки.
-            # Це дозволить нам зрозуміти, яку саме сторінку віддав сайт замість графіка.
-            snippet = text[:400].replace('<', '&lt;').replace('>', '&gt;')
-            return {"error": f"❌ Змінну не знайдено. Сервер повернув іншу сторінку:\n\n{snippet}..."}
+            return {"error": f"❌ Змінну не знайдено на сторінці. Можливо, ліміт API або інша помилка."}
 
-        # --- Старий перевірений код парсингу ---
         js_code = text.split(search_key)[1]
         start_idx = js_code.find("{")
         
@@ -234,8 +209,10 @@ async def send_schedule(message: Message):
     
     if "error" in data:
         await wait_msg.edit_text(data["error"])
+        return
     elif not data:
         await wait_msg.edit_text("⚠️ Немає даних для вашої групи.")
+        return
     else:
         dates = list(data.keys())
         dates_str = ", ".join(dates)
@@ -277,10 +254,8 @@ async def handle_future_task(message: Message):
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     
-    # ДОБАВЛЕНО: Сначала запускаем веб-сервер...
     await start_web_server()
     
-    # ...а затем запускаем опрос Telegram
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

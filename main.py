@@ -39,21 +39,6 @@ keyboard = ReplyKeyboardMarkup(
 )
 
 def fetch_schedule_data():
-    try:
-        url = "https://www.dtek-kem.com.ua/ua/shutdowns"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-        }
-        
-        # Прокси для прохождения через бесплатный тариф PythonAnywhere
-        proxies = {
-            "http": "http://proxy.server:3128",
-            "https": "http://proxy.server:3128"
-        }
-        
-        response = requests.get(url, headers=headers, impersonate="chrome110", proxies=proxies)
-
-def fetch_schedule_data():
     """Синхронна функція для алгоритмічного парсингу HTML-коду ДТЕК"""
     try:
         url = "https://www.dtek-kem.com.ua/ua/shutdowns"
@@ -61,8 +46,12 @@ def fetch_schedule_data():
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         }
         
-        # Використовуємо curl_cffi для обходу захисту
-        response = requests.get(url, headers=headers, impersonate="chrome110")
+         proxies = {
+            "http": "http://proxy.server:3128",
+            "https": "http://proxy.server:3128"
+        }
+        
+        response = requests.get(url, headers=headers, impersonate="chrome110", proxies=proxies)
 
         if response.status_code != 200:
             return {"error": f"❌ Помилка доступу до сайту ДТЕК: {response.status_code}"}

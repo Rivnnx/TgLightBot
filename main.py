@@ -9,7 +9,6 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from aiogram import Bot, Dispatcher, F
-from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 from aiogram.filters import Command
 from aiogram.utils.media_group import MediaGroupBuilder
@@ -26,7 +25,6 @@ if not BOT_TOKEN:
 
 MY_GROUP = "GPV54.1"
 
-session = AiohttpSession(proxy="http://proxy.server:3128")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -46,12 +44,8 @@ def fetch_schedule_data():
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         }
         
-         proxies = {
-            "http": "http://proxy.server:3128",
-            "https": "http://proxy.server:3128"
-        }
         
-        response = requests.get(url, headers=headers, impersonate="chrome110", proxies=proxies)
+        response = requests.get(url, headers=headers, impersonate="chrome110")
 
         if response.status_code != 200:
             return {"error": f"❌ Помилка доступу до сайту ДТЕК: {response.status_code}"}

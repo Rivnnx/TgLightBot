@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from aiogram import Bot, Dispatcher, F
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 from aiogram.filters import Command
 from aiogram.utils.media_group import MediaGroupBuilder
@@ -25,6 +26,7 @@ if not BOT_TOKEN:
 
 MY_GROUP = "GPV54.1"
 
+session = AiohttpSession(proxy="http://proxy.server:3128")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -35,6 +37,21 @@ keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+
+def fetch_schedule_data():
+    try:
+        url = "https://www.dtek-kem.com.ua/ua/shutdowns"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        }
+        
+        # Прокси для прохождения через бесплатный тариф PythonAnywhere
+        proxies = {
+            "http": "http://proxy.server:3128",
+            "https": "http://proxy.server:3128"
+        }
+        
+        response = requests.get(url, headers=headers, impersonate="chrome110", proxies=proxies)
 
 def fetch_schedule_data():
     """Синхронна функція для алгоритмічного парсингу HTML-коду ДТЕК"""
